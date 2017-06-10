@@ -1,0 +1,130 @@
+.spinner_loading {
+    display:    none;
+    position:   fixed;
+    z-index:    1000;
+    top:        0;
+    left:       0;
+    height:     100%;
+    width:      100%;
+    background: rgba( 255, 255, 255, .8 ) 
+                url('images/udlogo-rotating.gif') 
+                50% 50% 
+                no-repeat;
+}
+
+body.loading {
+    overflow: hidden;   
+}
+
+body.loading .spinner_loading {
+    display: block;
+}
+
+.fondoceldadesign{
+    height: 115px;
+    width: 100%;
+    float: left;
+    clear:both;
+    left: auto;
+    right: auto;
+}
+
+.fondoceldaicon{
+    height: 119px;
+    width: 100%;
+    float: left;
+    clear:both;
+}
+
+.fondoceldacharacter{
+    height: 135px;
+    width: 100%;
+    float: left;
+    clear:both;
+}
+
+.celda {
+    width: 100%;
+    float: left;
+    min-height: 82px;
+    padding-left: 2.5%;
+    clear:both;
+}
+
+.formulario{
+    border: 2px solid #000000;
+    border-radius: 10px;
+    padding-bottom: 20px;
+    padding-top: 20px;
+    padding-left: 35px;
+    padding-right : 35px;
+    margin-bottom: 20px;
+    background-color: RGBA(150, 150, 150, 0.45);
+    color:#000000;
+    font-size: 16px;
+    width: 100%; 
+}
+
+.ft_message{
+    font-size: 18px !important; 
+    padding-right: 15%;
+    padding-left: 15%;
+    color: #ffffff;
+    text-align: justify;
+    background-color: black;
+    border-radius: 5px;
+    margin-top: 20px;
+}
+
+.form_component{
+    border-radius:5px !important; 
+    color:#000000 ;
+    font-size: 14px ;
+    vertical-align: middle;
+    min-height: 35px;
+    border: 1px solid #000000  ;
+    width: 100% ;
+    margin-left: auto;
+	margin-right: auto;
+	display: table;
+}
+
+.form_component button{
+	width: 80%;
+	background-color: #DE6826;
+	margin-left: auto;
+	margin-right: auto;
+	display: table;
+}
+
+*::-webkit-input-placeholder { color: #ffffff !important;font-weight: bold !important; } /* WebKit */
+*:-moz-placeholder { color: #ffffff !important;font-weight: bold !important; } /* Firefox 18- */
+*::-moz-placeholder { color: #ffffff !important;font-weight: bold !important; } /* Firefox 19+ */
+*:-ms-input-placeholder { color: #ffffff !important;font-weight: bold !important; }
+
+.eliminar_fichero{
+    font-size: 14px !important;
+          
+}
+
+a:hover {
+    color: #7BC1D8 !important;
+    font-weight: bold !important;
+} 
+
+.span{
+    padding-bottom: 10px;
+    padding-top: 10px;
+}
+
+.enviar:hover{
+    color: #000000 !important;
+}
+/* Validation styles*/
+.error {
+   color: #ff0000;
+   font-size: 12px;
+   margin-top: 5px;
+   margin-bottom: 0;
+}
+
