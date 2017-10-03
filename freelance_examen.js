@@ -27,13 +27,13 @@ jQuery(
 							$("#send_file_form").show();
 						} else {
 							$("#test_instructions_container").html("");
-							$("#message").html("Sorry, you are not authorised to access the test instructions, or you have already completed the test");
+							$("#message").html("Sorry, you have no enough priviledges to access the test instructions or had done the test already");
 							$('#step2').hide();
 						}
 					}
 				});
 			} else {
-				$("#message").html("Please enter your email address to check if you have access to the test instructions");
+				$("#message").html("Please enter your email to check if you have access to test instructions");
 			}
 		});
 
@@ -76,7 +76,7 @@ jQuery(
 					}
 				});
 			} else {
-				$("#step2_message").html("Please select the .zip file with your test code.");
+				$("#step2_message").html("Please select the .zip file with your test answers.");
 				return false;
 			}
 		});
@@ -88,11 +88,11 @@ jQuery(
         
         $('#register_button').click( function(e){
 			e.preventDefault();
-			var $imgFile    = $('#cv_file_upload');
+			//var $imgFile    = $('#cv_file_upload');
 			var data = new FormData(document.getElementById("form_register"));
             if ($("#form_register").valid()){
 				data.append('action', 'freelance_register');
-				data.append('async-upload', $imgFile[0].files[0]);
+				//data.append('async-upload', $imgFile[0].files[0]);
 				data.append('security',ajax_object.nonce_register);
 				data.append('email',$('#email').val());
 
@@ -121,48 +121,7 @@ jQuery(
                 	required: true,
                 	email: true
                 },
-                "long_term_goals" : {
-                	required: true
-                },
-                "looking_for" : {
-                	required: true
-                },
-                "total_experience" : {
-                	required: true,
-                	number: true
-                },
-                "php_level" : {
-                	required: true,
-                	number: true,
-                	range: [1, 10]
-                },
-                "js_level" : {
-                	required: true,
-                	number: true,
-                	range: [1, 10]
-                },
-                "wp_level" : {
-                	required: true,
-                	number: true,
-                	range: [1, 10]
-                },
-                "plugin_url" : {
-                	url: true
-                },
-                "long_term_rate" : {
-                	number: true,
-                	required: true
-                },
-                "starting_date" : {
-	              	required: true,
-      			  	date: true
-                },
-                "online_cv_link" : {
-	              	url: true
-                },
-                "test_available" : {
-	              	required: true
-                },
+                
             },
             errorPlacement: function(error, element) {
 	            if ( element.is(":radio") ) 

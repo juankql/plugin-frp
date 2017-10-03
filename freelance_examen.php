@@ -2,82 +2,70 @@
 /*
 Plugin Name: Freelance Test App
 Plugin URI: https://updraftplus.com
-Description: The main goal of this plugin is to be a platform for the freelances to upload their test results for the updraftplus team review.
+Description: The main goal of this plugin is to be a platform for the freelancers to apply and upload their test results for the updraftplus team review.
 Version: 2.0.0.AR
 Author : Ing. Juan Carlos Quevedo Lussón
 Author URI: https://updraftplus.com   
 License: GPLv3 or later 
 */
 
-if(!class_exists('WP_Frelance_Test')) {
+if(!class_exists( 'WP_Freelance_Test' ) ) {
 
-class WP_Frelance_Test
-{
+class WP_Freelance_Test {
 	private $upload_dir = "";
-	
-	public function __construct(){
-		add_action('admin_menu', array($this, 'ft_view_menu'));
-		add_action('admin_init', array($this,'ft_register_settings'));
-		add_action('admin_enqueue_scripts', array($this, 'admin_enqueue_scripts'), 99999);
-		register_activation_hook(__FILE__, array($this, 'activate'));
 
-		add_action( 'wp_ajax_check_email',  array($this,'check_email_action_callback') ); 
-		add_action( 'wp_ajax_freelance_upload_file',  array($this,'freelance_upload_file') );
-		add_action( 'wp_ajax_freelance_register', array($this,'freelance_register'));
-		add_action( 'wp_ajax_ft_admin_delete_applicant', array($this,'ft_admin_delete_applicant')); 
-		add_action( 'wp_ajax_ft_admin_accept_applicant', array($this,'ft_admin_accept_applicant')); 
-		add_action( 'wp_ajax_ft_admin_denied_applicant', array($this,'ft_admin_denied_applicant'));
-		add_action( 'wp_ajax_ft_admin_eval_test', array($this,'ft_admin_eval_test')); 
-		
-		add_shortcode('ft_frontend_interface', array($this, 'ft_frontend_interface'));
+	public function __construct() {
+		add_action( 'admin_menu', array( $this, 'ft_view_menu' ) );
+		add_action( 'admin_init', array( $this,'ft_register_settings'));
+		add_action( 'admin_enqueue_scripts', array( $this, 'admin_enqueue_scripts' ), 99999 );
+		register_activation_hook( __FILE__, array( $this, 'activate' ) );
+
+		add_action( 'wp_ajax_check_email',  array( $this,'check_email_action_callback' ) );
+		add_action( 'wp_ajax_freelance_upload_file',  array( $this,'freelance_upload_file' ) );
+		add_action( 'wp_ajax_freelance_register', array( $this,'freelance_register' ) );
+		add_action( 'wp_ajax_ft_admin_delete_applicant', array( $this,'ft_admin_delete_applicant' ) );
+		add_action( 'wp_ajax_ft_admin_accept_applicant', array( $this,'ft_admin_accept_applicant' ) );
+		add_action( 'wp_ajax_ft_admin_denied_applicant', array( $this,'ft_admin_denied_applicant' ) );
+		add_action( 'wp_ajax_ft_admin_eval_test', array( $this,'ft_admin_eval_test' ) );
+		add_action( 'wp_ajax_ft_admin_insert_question', array( $this,'ft_admin_insert_question' ) );
+		add_action( 'wp_ajax_ft_admin_delete_question', array( $this,'ft_admin_delete_question' ) );
+		add_action( 'wp_ajax_ft_admin_get_question_by_id', array( $this,'ft_admin_get_question_by_id' ) );
+
+		add_shortcode( 'ft_frontend_interface', array( $this, 'ft_frontend_interface' ) );
 	}
-	
+
 	public function ft_admin_delete_applicant() {
-	
-		if (!current_user_can('manage_options')) die('Security check.');
-	
 		$action = $_REQUEST['action'];
 		$id = $_REQUEST['id'];
-		check_ajax_referer( 'delete_email'.$id, 'security' );   
-		
-		//
+		check_ajax_referer( 'delete_email'.$id, 'security' );
+
 		global $wpdb;
-		$table = $wpdb->prefix."freelance_test_data";   			
-		$file_path_test = $wpdb->get_var($wpdb->prepare("SELECT zip_path FROM $table WHERE ID = %d",$id));
-		$file_path_cv = $wpdb->get_var($wpdb->prepare("SELECT cv_path FROM $table WHERE ID = %d",$id));
-		if($wpdb->delete( $table, array( 'ID' => $id ), array( '%d' ) )){
-			if(is_file($file_path_test)){
-				$file_path_info = pathinfo($file_path_test);
-				if($file_path_info['dirname'] == 'ft_uploaded_files' && $file_path_info['extension'] == 'zip') {
-					unlink($file_path_test);
-				} else {
-					$response['type'] = 'ok';
-					$response['message'] = 'Could not delete applicant test file. Wrong file detected';
-					$response['list'] = $this->ft_populate_table_freelancers();
-					header('Content-Type: application/json');
-					echo json_encode( $response );
-					wp_die();
+		$table = $wpdb->prefix."freelance_test_data";
+		$file_path_test = $wpdb->get_var($wpdb->prepare("SELECT zip_path FROM $table WHERE ID = %s",$id));
+		// Getting if exists all the files freelance has uploaded and deleting it
+		$query = "Select * FROM $table WHERE id=%s";
+
+		$result = $wpdb->get_row($wpdb->prepare($query,$id),OBJECT);
+
+		$answers = unserialize($result->answers);
+
+		if( $wpdb->delete( $table, array( 'ID' => $id ), array( '%d' ) ) ){
+			if( is_file( $file_path_test ) ) {
+				unlink( $file_path_test );
+			}
+
+			foreach( $answers as $answer ) {
+				if( isset( $answer['file'] ) && is_file( $answer['file'] ) ) {
+					unlink( $answer['file'] );
 				}
 			}
-			if(is_file($file_path_cv)){
-				$cv_path_info = pathinfo($file_path_test);
-				if($cv_path_info['dirname'] == 'ft_uploaded_files') {
-					unlink($file_path_cv);
-				} else {
-					$response['type'] = 'ok';
-					$response['message'] = 'Could not delete applicant CV. Wrong file detected';
-					$response['list'] = $this->ft_populate_table_freelancers();
-					header('Content-Type: application/json');
-					echo json_encode( $response );
-					wp_die();
-				}
-			}
+			
 			$response['type'] = 'ok';
 			$response['message'] = 'The applicant was succesfully deleted from the database.';
 			$response['list'] = $this->ft_populate_table_freelancers();
 			header('Content-Type: application/json');
 			echo json_encode( $response );
-			wp_die();
+			wp_die();	
 		} else {
 			$response['type'] = 'ok';
 			$response['message'] = 'Sorry. The applicant was not deleted from the database.';
@@ -89,16 +77,13 @@ class WP_Frelance_Test
 	}
 	
 	public function ft_admin_denied_applicant() {
-	
-		if (!current_user_can('manage_options')) die('Security check.');
-
 		$action = $_REQUEST['action'];
 		$id = $_REQUEST['id'];
 		check_ajax_referer( 'deny_applicant'.$id, 'security' );
 		
 		global $wpdb;
 		$table = $wpdb->prefix."freelance_test_data";
-		$applicant_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE ID = %d",$id),OBJECT);
+		$applicant_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE ID = %s",$id),OBJECT);
 		
 		if(count($applicant_data) > 0){
 			$ft_test_contact_email = get_option('ft_test_contact_email');
@@ -106,9 +91,8 @@ class WP_Frelance_Test
 			$filled_template = str_replace('[freelance_name]',esc_html($applicant_data->name),$ft_template_accepting);
 			
 	        $to=array($applicant_data->email);
-	        $subject='Your freelance application has now been accepted';
-	        $headers = array();
-	        $headers[] = 'Reply-to: '.$ft_test_contact_email.' <'.$ft_test_contact_email.'>';
+	        $subject='Your freelance application now is accepted';
+	        $headers = 'Reply-to: '.$ft_test_contact_email.'<'.$ft_test_contact_email.'>' . "\r\n";
 	        
 			$message_content="<html>
 				<head>
@@ -130,7 +114,7 @@ class WP_Frelance_Test
 			 $message_content.="			
 						<hr>
 						<p align='center' class='style1'>.:.:.:.:.:.:.:.:.:.: This email is autogenerated by Freelance Test Plugin :.:.:.:.:.:.:.:.:.:.</p>
-						<p align='center' class='style1'>Please do not reply to this email.</p> 
+						<p align='center' class='style1'>Please dont answer this email.</p> 
 				</body>
 			</html>";
 	         
@@ -157,7 +141,7 @@ class WP_Frelance_Test
 			} 
 		} else {
 			$response['type'] = 'ok';
-			$response['message'] = "Sorry. The applicant was already notified or doesn't exist on the database. Please refresh this page.";
+			$response['message'] = 'Sorry. The applicant was already notified or dont exists on the database. Please refresh this page.';
 			header('Content-Type: application/json');
 			echo json_encode( $response );
 			wp_die();
@@ -165,16 +149,13 @@ class WP_Frelance_Test
 	}
 	
 	public function ft_admin_accept_applicant() {
-	
-		if (!current_user_can('manage_options')) die('Security check.');
-
 		$action = $_REQUEST['action'];
 		$id = $_REQUEST['id'];
 		check_ajax_referer( 'accept_applicant'.$id, 'security' );
 		
 		global $wpdb;
 		$table = $wpdb->prefix."freelance_test_data";
-		$applicant_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE ID = %d and status = 1",$id),OBJECT);
+		$applicant_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE ID = %s and status = 1",$id),OBJECT);
 		
 		if(count($applicant_data)> 0){
 			$ft_test_contact_email = get_option('ft_test_contact_email');
@@ -182,9 +163,8 @@ class WP_Frelance_Test
 			$filled_template = str_replace('[freelance_name]',esc_html($applicant_data->name),$ft_template_accepting);
 			
 	        $to=array($applicant_data->email);
-	        $subject='Your freelance application has now been accepted';
-	        $headers = array();
-	        $headers[] = 'Reply-to: '.$ft_test_contact_email.' <'.$ft_test_contact_email.'>';
+	        $subject='Your freelance application now is accepted';
+	        $headers = 'Reply-to: '.$ft_test_contact_email.'<'.$ft_test_contact_email.'>' . "\r\n";
 	        
 			$message_content="<html>
 				<head>
@@ -206,7 +186,7 @@ class WP_Frelance_Test
 			 $message_content.="			
 						<hr>
 						<p align='center' class='style1'>.:.:.:.:.:.:.:.:.:.: This email is autogenerated by Freelance Test Plugin :.:.:.:.:.:.:.:.:.:.</p>
-						<p align='center' class='style1'>Please do not reply to this email.</p> 
+						<p align='center' class='style1'>Please dont answer this email.</p> 
 				</body>
 			</html>";
 	         
@@ -233,7 +213,7 @@ class WP_Frelance_Test
 			} 
 		} else {
 			$response['type'] = 'ok';
-			$response['message'] = "Sorry. The applicant was already notified or doesn't exist on the database. Please refresh this page.";
+			$response['message'] = 'Sorry. The applicant was already notified or dont exists on the database. Please refresh this page.';
 			header('Content-Type: application/json');
 			echo json_encode( $response );
 			wp_die();
@@ -241,9 +221,6 @@ class WP_Frelance_Test
 	}
 	
 	public function ft_admin_eval_test(){
-	
-		if (!current_user_can('manage_options')) die('Security check.');
-
 		$action = $_REQUEST['action'];
 		$id = $_REQUEST['id'];
 		$test_eval = $_REQUEST['evaluation'];
@@ -252,14 +229,14 @@ class WP_Frelance_Test
 		$current_user = wp_get_current_user();   
 		global $wpdb;
 		$table = $wpdb->prefix."freelance_test_data";
-		$applicant_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE ID = %d and status = 4",$id),OBJECT);
+		$applicant_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE ID = %s and status = 2",$id),OBJECT);
 		
 		if(count($applicant_data)> 0){
 			$wpdb->update($table,array('test_comments' => $test_comments, 'test_eval' =>$test_eval),array('id' => $id));
 			$ft_test_contact_email = get_option('ft_test_contact_email');
 	        $to=array($ft_test_contact_email);
-	        $subject='Freelance test evaluation notification';
-	        $headers = array('Reply-to: '.$ft_test_contact_email.'<'.$ft_test_contact_email.'>');
+	        $subject='Freelance test evaluation notify';
+	        $headers = 'Reply-to: '.$ft_test_contact_email.'<'.$ft_test_contact_email.'>' . "\r\n";
 	        
 			$message_content.="<html>
 				<head>
@@ -279,18 +256,18 @@ class WP_Frelance_Test
 				<body>
 					<div>
 						<h1 align='center'>Hi, admin</h1>
-						<p>".htmlspecialchars($current_user->user_email)." has evaluated the test submited by the freelance applicant.
+						<p>".esc_attr($current_user->user_email)."Had evaluated the test submited from freelance applicant.
 						<p><b>Freelance data</b></p>
-						<p>Name:".htmlspecialchars($applicant_data->name)." </p> 
-						<p>Email:".htmlspecialchars($applicant_data->email)." </p>
+						<p>Name:".esc_attr($applicant_data->name)." </p> 
+						<p>Email:".esc_attr($applicant_data->email)." </p>
 						<p><b>Evaluation data</b></p>
-						<p>Evaluator email:".htmlspecialchars($current_user->user_email)." </p>
-						<p>Evaluation:".htmlspecialchars($test_eval)." </p>
-						<p>Evaluation note:".htmlspecialchars($test_comments)." </p>    
+						<p>Evaluator email:".esc_attr($current_user->user_email)." </p>
+						<p>Evaluation:".esc_attr($test_eval)." </p>
+						<p>Evaluation note:".esc_attr($test_comments)." </p>    
 						<hr>
 						
 						<p align='center' class='style1'>.:.:.:.:.:.:.:.:.:.: This email is autogenerated by Freelance Test Plugin :.:.:.:.:.:.:.:.:.:.</p>
-						<p align='center' class='style1'>Please do not reply to this email.</p> 
+						<p align='center' class='style1'>Please dont answer this email.</p> 
 					</div>
 				</body>
 			</html>";
@@ -347,7 +324,7 @@ class WP_Frelance_Test
 		 
 		if($result > 0) {
 			$response['type'] = 'error';
-			$response['message'] = 'This email is already registered.';
+			$response['message'] = 'This email is already used for a previous test.';
 			$response['value'] = $result;
 			header('Content-Type: application/json');
 			echo json_encode( $response );
@@ -356,53 +333,38 @@ class WP_Frelance_Test
 			$cv_url = '';
 			$cv_path = '';
 			
-		   if(isset($_FILES['async-upload']) && $_FILES['async-upload'] !== 'undefined') {
-				$uploadedfile = $_FILES['async-upload'];
-				$upload_overrides = array( 'test_form' => false );
-				
-				add_filter('upload_dir', array($this,'my_upload_dir'));
-				$movefile = wp_handle_upload( $uploadedfile, $upload_overrides );
-				remove_filter('upload_dir', array($this,'my_upload_dir'));
-				$cv_url = $movefile['url'];
-				$cv_path = $movefile['file'];	
-			}
-				
-			$name = sanitize_text_field($_POST['name']);
-			$long_term_goals = sanitize_text_field($_POST['long_term_goals']);
-			$long_term_relationship = sanitize_text_field($_POST['looking_for']);
-			$experience_time = sanitize_text_field($_POST['total_experience']);
-			$php_level = sanitize_text_field($_POST['php_level']);
-			$js_level = sanitize_text_field($_POST['js_level']);
-			$wp_level = sanitize_text_field($_POST['wp_level']);
-			$plugin_url = sanitize_text_field($_POST['plugin_url']);
-			$backup_plugin = sanitize_text_field($_POST['backup_plugin']);
-			$long_term_rate = sanitize_text_field($_POST['long_term_rate']);
-			$starting_date = sanitize_text_field($_POST['starting_date']);
-			$online_cv_link = sanitize_text_field($_POST['online_cv_link']);
-			$test_date = sanitize_text_field($_POST['test_date']);
+            $table_question = $wpdb->prefix."question_test_data"; 
+		   	$query = "Select * FROM $table_question";
+			$questions = $wpdb->get_results($wpdb->prepare($query));
 			
-			if($wpdb->insert( $table, array('email' =>$email,'name'=> $name, 'long_term_goals'=>$long_term_goals,'long_term_relationship'=>$long_term_relationship,'experience_time' => $experience_time, 'php_level' => $php_level, 'js_level' => $js_level, 'wp_level' => $wp_level, 'plugin_link' => $plugin_url,'backup_plugin' => $backup_plugin, 'working_rate' => $long_term_rate, 'start_availability' => $starting_date, 'online_profile_link' => $online_cv_link, 'cv_url' => $cv_url, 'cv_path' => $cv_path, 'date_test' => $test_date))) {
+			$answers = array();
+			add_filter('upload_dir', array($this,'my_upload_dir')); 
+			foreach($questions as $question) {
+				if(isset($_FILES['question_'.$question->id]) && $_FILES['question_'.$question->id] !== 'undefined') {
+					$uploadedfile = $_FILES['question_'.$question->id];
+					$upload_overrides = array( 'test_form' => false );
+					
+					$movefile = wp_handle_upload( $uploadedfile, $upload_overrides );
+					$answers[$question->id] = $movefile;
+				} else {
+					if(isset ($_POST['question_'.$question->id])){
+						$answers[$question->id] = sanitize_text_field($_POST['question_'.$question->id]);  	
+					}
+				}
+			}
+			remove_filter('upload_dir', array($this,'my_upload_dir'));  
+			
+			$answers_to_db = serialize($answers);	
+			$name = sanitize_text_field($_POST['name']);
+			
+			if( $wpdb->insert( $table, array('email' =>$email,'name'=> $name, 'answers' => $answers_to_db ) ) ) {
 			//We send the email to the plugin contact email
 			$ft_test_contact_email = get_option('ft_test_contact_email');
             $to=array($ft_test_contact_email);
             $subject='New Freelance Application';
-            $headers = array('Reply-to: '.$name.'<'.$email.'>');
-            $developed_plugin = "No";
-            if($plugin_url !="") {
-            	$developed_plugin = "Yes. (<a href='".esc_url($plugin_url)."'>".htmlspecialchars($plugin_url)."</a>)";	
-            }
-            $used_backup_plugin = "No";
-            if($backup_plugin !="" && $backup_plugin !="No") {
-            	$used_backup_plugin = "Yes. (".htmlspecialchars($backup_plugin).")";	
-            }
-            $online_profile = "Not specified";
-            if($online_cv_link !="") {
-            	$online_profile = "Yes. (<a href='".esc_url($online_cv_link)."'>".htmlspecialchars($online_cv_link)."</a>)";	
-            }
-            $cv_file = "No uploaded";
-            if($cv_url !="" && $cv_url !="No") {
-            	$cv_file = "Yes. (<a href='".esc_url($cv_url)."'>".htmlspecialchars($cv_url)."</a>)";	
-            }
+            $headers = 'Reply-to: '.$name.'<'.$email.'>' . "\r\n";
+            
+            
             $message_content.="<html>
                         <head>
                         <meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
@@ -423,23 +385,24 @@ class WP_Frelance_Test
                         <h1 align='center'>New Freelance Application</h1>
                         <p><b>Name</b>: ".esc_html($name)."</p>
                         <p><b>Email</b>: ".esc_attr($email)."</p>
-                        <p><b>Long terms goals</b>: ".esc_attr($long_term_goals)."</p> 
-                        <p><b>Looking for</b>: ".esc_attr($long_term_relationship)."</p>
-                        <p><b>Years of experience</b>: ".esc_attr($experience_time)."</p> 
-                        <p><b>Development experience</b>:</p>
-                        <p><b>PHP Level</b>: ".esc_attr($php_level)."/10</p>
-                        <p><b>JS Level</b>: ".esc_attr($js_level)."/10</p>
-                        <p><b>Wordpress Level</b>: ".esc_attr($wp_level)."/10</p>
-                        <p><b>Had created an open source plugin?</b>: ".$developed_plugin."</p> 
-                        <p><b>Had used an open backup plugin?</b>: ".esc_attr($used_backup_plugin)."</p> 
-                        <p><b>Long term rate</b>: ".esc_attr($long_term_rate)."</p>
-                        <p><b>Availability to start</b>: ".esc_attr($starting_date)."</p>  
-                        <p><b>Online profile link</b>: ".$online_profile."</p> 
-                        <p><b>Had uploaded CV?</b>: ".$cv_file."</p>
-                        <p><b>Availability to take the test</b>: ".esc_attr($test_date)."</p> 
-                        <hr>
+                        <p><b>Date of Application:</b> ".date("Y-m-d H:i:s")."</p>";
+						if(is_array($answers)){ 
+							foreach ($answers as $id => $answer){
+								$table_question = $wpdb->prefix."question_test_data"; 
+								$query = "Select * FROM $table_question WHERE id=%s";
+								$question_base = $wpdb->get_row($wpdb->prepare($query,$id),OBJECT);
+								$answer_to_text = '';
+								if($question_base->type == 'file') {
+									$answer_to_text = '<p><a title="Download the file" href="'.$answer['url'].'">File</a></p>';	
+								} else {
+									$answer_to_text = '<p>'.esc_attr($answer).'</p>';	
+								}
+								$formated_user_answers.= '<p><b>'.esc_attr($question_base->question_text).':</b></p>'.$answer_to_text;
+							}
+						}
+            $message_content.=$formated_user_answers."<hr>
                         <p align='center' class='style1'>.:.:.:.:.:.:.:.:.:.: This email is autogenerated by Freelance Test Plugin :.:.:.:.:.:.:.:.:.:.</p>
-                        <p align='center' class='style1'>You can contact the applicant by replying to this email.</p> 
+                        <p align='center' class='style1'>You can contact to the applicant replying this email.</p> 
                         </div>
                         </body>
                         </html>";
@@ -455,20 +418,17 @@ class WP_Frelance_Test
 				echo json_encode( $response );
 				wp_die();	
             } else {
-                $response['type'] = 'ok';
-				$response['message'] = 'Thanks for your application. Our team will review your profile and we will contact you within the next few days.';
+                $response['type'] = 'error';
+				$response['message'] = 'Sorry. The mail was not sent';
 				header('Content-Type: application/json');
 				echo json_encode( $response );
 				wp_die();	 
             }
-         } else {
-                $response['type'] = 'error';
-				$response['message'] = 'Sorry. The application was not sent. Please try again.';
-				header('Content-Type: application/json');
-				echo json_encode( $response );
-				wp_die();
-			}
-
+            
+            remove_filter( 'wp_mail_content_type', 'wpdocs_set_html_mail_content_type' );
+         }
+            
+        
 		}  
 	}
 	
@@ -503,7 +463,7 @@ class WP_Frelance_Test
 					$wpdb->update($table,array('status' => 4),array('id' => $result2->id));  
 					$response['end_time'] = $result2->time_end;
 					$response['type'] = 'ok';
-					$response['message'] = 'Thank you for your time. Our team will review your code and we will contact you soon.';
+					$response['message'] = 'Thanks for your time. Our team will review your code and we will contact you soon.';
 					header('Content-Type: application/json');
 					echo json_encode( $response );
 					wp_die();
@@ -527,7 +487,7 @@ class WP_Frelance_Test
 			}
 		} else {
 			$response['type'] = 'error';
-			$response['message'] = "You have already performed the test.";
+			$response['message'] = "You already had done the test";
 			header('Content-Type: application/json');
 			echo json_encode( $response );
 			wp_die();
@@ -572,7 +532,8 @@ class WP_Frelance_Test
 	
 	public static function activate(){
 		global $wpdb;
-		$table = $wpdb->prefix."freelance_test_data";
+		$table_freelance = $wpdb->prefix."freelance_test_data";
+		$table_questions = $wpdb->prefix."question_test_data";    
 		$collate = '';
 
 		if ($wpdb->has_cap('collation')) {
@@ -589,24 +550,11 @@ class WP_Frelance_Test
 		// Important: obey the magical/arbitrary rules for formatting this stuff: https://codex.wordpress.org/Creating_Tables_with_Plugins
 		
 		
-		$structure = "CREATE TABLE $table (
+		$structure_freelance_table = "CREATE TABLE $table_freelance (
 			id int(9) NOT NULL auto_increment, 
 			name varchar (100) NOT NULL default '',
 			email varchar(80) NOT NULL,
-			long_term_goals longtext,
-			long_term_relationship varchar (255),
-			experience_time int,
-			php_level int,
-			js_level int,
-			wp_level int,
-			plugin_link varchar (255),
-			backup_plugin varchar(80),
-			working_rate varchar(20),
-			start_availability date, 
-			online_profile_link varchar(255),
-			cv_url varchar(255) default '',
-			cv_path varchar(255) default '',
-			date_test varchar (3),
+			answers text NOT NULL default '',
 			time_begin datetime NOT NULL default '0000-00-00 00:00:00',
 			time_end datetime NOT NULL default '0000-00-00 00:00:00',
 			zip_url varchar(255) default '',
@@ -614,11 +562,26 @@ class WP_Frelance_Test
 			status int default 1,
 			test_eval int default -1,
 			test_comments varchar (255),
+			application_date datetime NOT NULL default Now(),
 		PRIMARY KEY  (id),
 		UNIQUE KEY email (email)
 		) $collate;";
 		
-		dbDelta($structure);
+		dbDelta($structure_freelance_table);
+		
+		$structure_questions_table = "CREATE TABLE $table_questions (
+			id int(9) NOT NULL auto_increment, 
+			question_text text NOT NULL default '',
+			required varchar(3) default 'No',
+			type varchar(10) default 'text',
+			options text default '',
+			range_min int default 0,
+			range_max int default 0,
+		PRIMARY KEY  (id)
+		) $collate;";
+		
+		dbDelta($structure_questions_table);     
+		
 	}
 		
 	public static function deactivate() {
@@ -630,24 +593,26 @@ class WP_Frelance_Test
 	} 
 	
 	public function ft_frontend_interface(){
+	
 		if (!is_user_logged_in()) {
 			return 'You need to be logged in to see this content.';
+		}
+	
+		add_action('ft_admin_footer', array($this,'ft_enqueue_styles'));
+		add_action('ft_admin_footer', array($this,'ft_enqueue_scripts'));
+		
+		//Get the current user data and if doesnt exists on database then show the form for register application
+		//if exists then show the form for taking test
+      	$current_user = wp_get_current_user(); 
+      	if($this->ft_is_applicant($current_user->user_email)) {
+			include('views/frontend_view_test.php');
 		} else {
-			if(!is_admin()) {
-				add_action('ft_admin_footer', array($this,'ft_enqueue_styles'));
-				add_action('ft_admin_footer', array($this,'ft_enqueue_scripts'));
-				
-				//Get the current user data and if doesnt exists on database then show the form for register application
-				//if exists then show the form for taking test
-      			$current_user = wp_get_current_user(); 
-      			if($this->ft_is_applicant($current_user->user_email)) {
-					include('views/frontend_view_test.php');
-				} else {
-					include('views/frontend_view_register.php');
-				}
-				do_action('ft_admin_footer'); 
-			}		
-		}  
+			global $wpdb; 
+			$table = $wpdb->prefix."question_test_data";
+			$questions = $wpdb->get_results("SELECT * FROM $table");
+			include('views/frontend_view_register.php');
+		}
+		do_action('ft_admin_footer');  
 	}
 
 	private function ft_is_applicant($email) {
@@ -727,26 +692,31 @@ class WP_Frelance_Test
 				$date_diff = "";
 			}
 
+			
 			//Preparing user answer to form
 			$formated_user_answers='<p><b>Name:</b> '.esc_attr($result->name).'</p>';
 			$formated_user_answers.='<p><b>Email:</b> '.esc_attr($result->email).'</p>';
 			$formated_user_answers.='<div id="thickbox'.$result->id.'" style="display:none;">';
 			$formated_user_answers.='<p><b>Name:</b> '.esc_attr($result->name).'</p>';
 			$formated_user_answers.='<p><b>Email:</b> '.esc_attr($result->email).'</p>';
-			$formated_user_answers.='<p><b>Long terms goals:</b> '.esc_attr($result->long_term_goals).'</p>';
-			$formated_user_answers.='<p><b>Looking for:</b> '.esc_attr($result->long_term_relationship).'</p>';
-			$formated_user_answers.='<p><b>Total experience:</b> '.esc_attr($result->experience_time).'</p>'; 
-			$formated_user_answers.='<p><b>Developer level:</b></p>';
-			$formated_user_answers.='<p><b>--PHP Level:</b> '.esc_attr($result->php_level).'</p>';   
-			$formated_user_answers.='<p><b>--JS Level:</b> '.esc_attr($result->js_level).'</p>';
-			$formated_user_answers.='<p><b>--WP Level:</b> '.esc_attr($result->wp_level).'</p>'; 
-			$formated_user_answers.='<p><b>Plugin developed:</b> '.esc_attr($result->plugin_link).'</p>';  
-			$formated_user_answers.='<p><b>Rate:</b> '.esc_attr($result->working_rate).'</p>';     
-			$formated_user_answers.='<p><b>Availability to start:</b> '.esc_attr($result->start_availability).'</p>';  
-			$formated_user_answers.='<p><b>Online CV:</b> '.esc_attr($result->online_profile_link).'</p>';
-			$link_cv = $result->cv_url != "" ? '<a title="Download the file" href="'.esc_attr($result->cv_url).'">File</a>' : '';   
-			$formated_user_answers.='<p><b>CV File:</b> '.$link_cv.'</p>';
-			$formated_user_answers.='<p><b>Availability for test:</b> '.esc_attr($result->date_test).'</p></div>';
+			$formated_user_answers.= '<p><b>Date of Application:</b> '.esc_attr($result->application_date).'</p>';
+			$answers = unserialize($result->answers);
+			if(is_array($answers)){ 
+				foreach ($answers as $id => $answer){
+					$table_question = $wpdb->prefix."question_test_data"; 
+					$query = "Select * FROM $table_question WHERE id=%s";
+					$question_base = $wpdb->get_row($wpdb->prepare($query,$id),OBJECT);
+					$answer_to_text = '';
+					if($question_base->type == 'file') {
+						$answer_to_text = '<p><a title="Download the file" target="_blank" href="'.$answer['url'].'">File</a></p>';	
+					} else {
+						$answer_to_text = '<p>'.esc_attr($answer).'</p>';	
+					}
+					$formated_user_answers.= '<p><b>'.esc_attr($question_base->question_text).':</b></p>'.$answer_to_text;
+				}
+			}
+			$formated_user_answers.='</div>';
+			
 			$formated_user_answers.='<p><a href="#TB_inline?width=600&height=500&inlineId=thickbox'.$result->id.'" class="thickbox">Show the full freelance data</a></p>';    
 			
 			//preparing buttons to accept or reject user
@@ -772,7 +742,7 @@ class WP_Frelance_Test
 			}
 			//Showing up the data in the table
 			$final_table.= '<tr>';
-			$final_table.= '<th scope="col" class="manage-column column-primary" style="width:1% !important;">'.$lap.'</th>';
+			$final_table.= '<th scope="col" class="manage-column column-primary" style="width:5% !important;">'.$result->id.'</th>';
 			$final_table.= '<th scope="col" class="manage-column column-primary" style="width:40% !important;">'.$formated_user_answers.'</th>';
 			$final_table.= '<th scope="col" class="manage-column">'.esc_attr($result->time_begin).'</th>';
 			$final_table.= '<th scope="col" class="manage-column">'.$date_diff.'</th>';
@@ -785,45 +755,227 @@ class WP_Frelance_Test
 		
 		return $final_table; 	
 	} 
+	
+	private function ft_populate_table_questions() {
+		global $wpdb; 
+		$table = $wpdb->prefix."question_test_data";
+		$results = $wpdb->get_results("SELECT * FROM $table");   
+		$lap =0;
+		$final_table = "";
+		foreach($results as $result){
+		   	//Preparing questions
+			//preparing buttons to modify or delete question 
+			$formated_buttons = '<button type="button" class="button-primary edit_question" data-edit_question_nonce="'.wp_create_nonce('edit_question'.esc_attr($result->id)).'" data-question_id = "'.esc_attr($result->id).'">Modify</button><br/><br/>';
+			$formated_buttons .= '<button type="button" class="button-primary delete_question" data-delete_question_nonce="'.wp_create_nonce('delete_question'.esc_attr($result->id)).'" data-question_id = "'.esc_attr($result->id).'" >Delete</button><br/><br/>';
+		
+			
+			
+			//Showing up the data in the table
+			$final_table.= '<tr>';
+			$final_table.= '<th scope="col" class="manage-column column-primary" style="width:5% !important;">'.esc_attr($result->id).'</th>';
+			$final_table.= '<th scope="col" class="manage-column" style="width:40% !important;">'.esc_attr($result->question_text).'</th>';
+			$final_table.= '<th scope="col" class="manage-column">'.esc_attr($result->required).'</th>';
+			$final_table.= '<th scope="col" class="manage-column">'.esc_attr($result->type).'</th>';
+			$final_table.= '<th scope="col" class="manage-column">'.esc_attr($result->range_min).'</th>'; 
+			$final_table.= '<th scope="col" class="manage-column">'.esc_attr($result->range_max).'</th>';
+			$options_to_text ="";
+			if($result->options !="") {
+				$options_to_array = unserialize($result->options);  
+				foreach($options_to_array as $option){
+					$options_to_text.="<p> - ".$option."</p>";	
+				}
+			}
+			$final_table.= '<th scope="col" class="manage-column">'.$options_to_text.'</th>'; 
+			$final_table.= '<th scope="col" class="manage-column">'.$formated_buttons.'</th>';
+			$final_table.= '</tr>';
+		}
+		
+		return $final_table; 	
+	} 
+	
+	private function input_for_question($question) {
+		 $required = ($question->required == 'yes') ? 'required':'';
+		 if($question->type == 'text'){
+		 	echo '<input type="text" '.$required.' class="form_component" name="question_'.$question->id.'" id="question_'.$question->id.'">';
+		 }
+		 if($question->type == 'longtext'){
+		 	wp_editor('','question_'.$question->id,array( 'editor_height' => '150px;' ));
+		 }
+		 if($question->type == 'number'){
+		 	 $range = '';
+		 	 if( $question->range_min !=0 || $question->range_max !=0 ){
+		   		$range = 'data-rule-range="'.$question->range_min.','.$question->range_max.'"';
+		 	}
+		 	
+		 	echo '<input type="number" '.$required.' class="form_component" name="question_'.$question->id.'" id="question_'.$question->id.'" '.$range.'>';
+		 }
+		 if($question->type == 'file'){
+		 	echo '<input type="file" '.$required.' class="form_component" name="question_'.$question->id.'" id="question_'.$question->id.'">';
+		 }
+		 if($question->type == 'email'){
+		 	echo '<input type="email" '.$required.' class="form_component" name="question_'.$question->id.'" id="question_'.$question->id.'">';
+		 }
+		 if($question->type == 'url'){
+		 	echo '<input type="url" '.$required.' class="form_component" name="question_'.$question->id.'" id="question_'.$question->id.'">';
+		 }
+		 if($question->type == 'radiobutton'){
+		 	$options = unserialize($question->options);
+		 	foreach($options  as $option) {
+		 		echo '<input type="radio" name="question_'.$question->id.'" id="question_'.$question->id.'" value="'.$option.'" > '.$option.'<br>';
+		 	}
+		 }
+		 if($question->type == 'checkbox'){
+		 	$options = unserialize($question->options); 
+		 	foreach($options  as $option) {
+		 		echo '<input type="checkbox" name="question_'.$question->id.'" id="question_'.$question->id.'" value="'.$option.'" > '.$option.'<br>';
+		 	}
+		 }
+	}
 		
 	public function ft_admin_page(){
 		if ( !current_user_can( 'manage_options' ) )  {
 			wp_die( __( 'You do not have sufficient permissions to access this page.' ) );
 		}
-		// Echoing the table with the results
-		echo '<h2>List of Freelance Applicants.</h2>';	    
-		echo '<table class="wp-list-table widefat fixed striped">';
-		echo '<thead>';
-		echo '<tr>';
-		echo '<th scope="col" class="manage-column column-primary" style="width:1% !important;">#</th>'; 
-		echo '<th scope="col" class="manage-column column-primary" style="width:40% !important;">Freelance application data</th>';  
-		echo '<th scope="col" class="manage-column">Start Date</th>';
-		echo '<th scope="col" class="manage-column">Test time</th>';
-		echo '<th scope="col" class="manage-column">Zip url</th>';
-		echo '<th scope="col" class="manage-column" style="width:20% !important;">Test results</th>';
-		echo '<th scope="col" class="manage-column"> Actions </th>';	
-		echo '</tr>';
-		echo '</thead>';
-		echo '<tbody id="ft-applicant-list">';
-		echo $this->ft_populate_table_freelancers();
-		echo '</tbody>';
-		echo '<tfoot>';
-		echo '<tr>';
-		echo '<th scope="col" class="manage-column column-primary" style="width:5% !important;">#</th>'; 
-		echo '<th scope="col" class="manage-column column-primary" style="width:40% !important;">Freelance application data</th>';
-		echo '<th scope="col" class="manage-column">Start Date</th>';
-		echo '<th scope="col" class="manage-column">Test time</th>';
-		echo '<th scope="col" class="manage-column">Zip url</th>';
-		echo '<th scope="col" class="manage-column">Test results</th>';
-		echo '<th scope="col" class="manage-column"> Actions </th>';	
-		echo '</tr>';
-		echo '</tfoot>';
-		echo '</table>';
+		// Echoing the tabs with the menu
+		$questions_Screen = ( isset( $_GET['action'] ) && 'test_elaboration' == $_GET['action'] ) ? true : false;
+        $config_Screen = ( isset( $_GET['action'] ) && 'config' == $_GET['action'] ) ? true : false;
+        
+		echo '<div class="wrap">';
+        echo '<h1>Freelance Test Plugin Dashboard</h1>';
+		echo '<h2 class="nav-tab-wrapper">';
+		echo '<a href="'.esc_url( add_query_arg( array( 'action' => 'list_Screen' ) ,admin_url( 'admin.php?page=ft_menu' ))).'" class="nav-tab ';
+		if ( ! isset( $_GET['action'] ) || (!$questions_Screen && !$config_Screen ) || ('list_Screen' == $_GET['action'])){
+			echo ' nav-tab-active';
+		}
+		
+		echo '"><span class="dashicons dashicons-id-alt"></span> Applicants list</a>';
+		echo '<a href="'.esc_url( add_query_arg( array( 'action' => 'test_elaboration' ), admin_url( 'admin.php?page=ft_menu' ) ) ).'" class="nav-tab';
+		if ( $questions_Screen ){
+			echo ' nav-tab-active'; 
+		}
+		
+		echo '"><span class="dashicons dashicons-analytics"></span> Questions manager</a><a href="'.esc_url( add_query_arg( array( 'action' => 'config' ), admin_url( 'admin.php?page=ft_menu' ) ) ).'" class="nav-tab';
+		if ( $config_Screen ){
+			echo ' nav-tab-active';
+		}
+		
+		echo '"><span class="dashicons dashicons-admin-settings"></span> Plugin configuration</a>';       
+		echo '</h2>';
+		echo '</div>';
+		
+		if($config_Screen){
+			$this->ft_admin_view_settings();
+		} elseif ($questions_Screen){
+			include('views/managing_questions.php');   	
+		} else {
+			// Echoing the table with the applicants 
+		   include('views/applicants_view.php');   	
+		}
+		
 	}
 
 	public function ft_view_menu() {
-			add_options_page( 'Freelance Test Plugin Configuration', 'Freelance Test', 'manage_options', 'freelance_test-settings', array($this,'ft_admin_view_settings') );
-			add_menu_page( 'Freelance Test Plugin', 'Freelance Test', 'manage_options', 'ft_menu', array($this, 'ft_admin_page'));
+			add_options_page( 'Freelance Test Plugin Configuration', 'Freelance Test', 'manage_options', 'freelance_test-settings', array($this,'ft_admin_view_settings'));
+			add_menu_page( 'Freelance Test Plugin', 'Freelance Test', 'manage_options', 'ft_menu', array($this, 'ft_admin_page'), 'dashicons-id-alt');
+	}
+	
+	public function ft_admin_insert_question(){
+		check_ajax_referer( 'insert_question', 'security' ); 
+		global $wpdb;
+		$table = $wpdb->prefix."question_test_data";
+		$wpdb->question_test_data = $table; 
+		
+		$id = intval( $_POST['question_id'] );
+		$question_text = sanitize_text_field($_POST['ft_insert_question_content']);
+		$range_min_value = intval($_POST['ft_range_min']);
+		$range_max_value = intval($_POST['ft_range_max']);
+		$question_required = isset( $_POST['ft_required'] ) ? sanitize_text_field($_POST['ft_required']) : "no";
+		$question_type = sanitize_text_field($_POST['ft_question_type']); 
+		$options = array(); 
+		$optionsdb = "";
+		if(!empty($_POST["ft_options"]) && is_array($_POST["ft_options"]) && ($question_type == 'checkbox' || $question_type == 'radiobutton' )){
+			foreach ( $_POST["ft_options"] as $option ) {
+				$options[$option] = $option;	
+			}	
+			$optionsdb=serialize($options);
+		}
+		
+		$query = "Select count(id) as counter FROM $table WHERE id=%s";
+		
+		$result = $wpdb->get_var($wpdb->prepare($query,$id)); 
+		
+		//if exists the question just update it with the new data 
+		if($result > 0) {
+			if($wpdb->update($table,array('question_text'=> $question_text,'required'=>$question_required,'type'=>$question_type,'options'=> $optionsdb,'range_min'=>$range_min_value,'range_max'=>$range_max_value),array('id'=>$id))){
+				$response['type'] = 'ok';
+				$response['message'] = 'The question was updated correctly.';
+			} else {
+				$response['type'] = 'error';
+				$response['message'] = 'The question was not updated correctly. Please try again.';
+			}
+			$response['list'] = $this->ft_populate_table_questions();   
+			header('Content-Type: application/json');
+			echo json_encode( $response );
+			wp_die();	
+		} else {
+			// if doesnt exsts then insert
+			if($wpdb->insert( $table, array('question_text'=> $question_text,'required'=>$question_required,'type'=>$question_type,'options'=>$optionsdb,'range_min'=>$range_min_value,'range_max'=>$range_max_value))) {
+				$response['type'] = 'ok';
+				$response['message'] = 'The question was inserted correctly.';
+			} else {
+				$response['type'] = 'error';
+				$response['message'] = 'The question was not inserted correctly. Please try again.';
+			}
+			$response['list'] = $this->ft_populate_table_questions();
+			header('Content-Type: application/json');
+			echo json_encode( $response );
+			wp_die();
+		}
+	
+	}
+	
+	public function ft_admin_delete_question() {
+		$action = $_REQUEST['action'];
+		$id = $_REQUEST['id'];
+		check_ajax_referer( 'delete_question'.$id, 'security' );   
+		
+		//
+		global $wpdb;
+		$table = $wpdb->prefix."question_test_data";   			
+		if($wpdb->delete( $table, array( 'ID' => $id ), array( '%d' ) )){
+			
+			$response['type'] = 'ok';
+			$response['message'] = 'The question was succesfully deleted from the database.';
+			$response['list'] = $this->ft_populate_table_questions();
+			header('Content-Type: application/json');
+			echo json_encode( $response );
+			wp_die();	
+		} else {
+			$response['type'] = 'ok';
+			$response['message'] = 'Sorry. The question was not deleted from the database.';
+			header('Content-Type: application/json');
+			echo json_encode( $response );
+			wp_die();
+		}
+		
+	}
+	
+	public function ft_admin_get_question_by_id() {
+		$id = $_REQUEST['id'];  
+		global $wpdb;
+		$table = $wpdb->prefix."question_test_data";
+		$wpdb->question_test_data = $table;
+		$query = "Select * FROM $table WHERE id=%s";
+		
+		$result = $wpdb->get_row($wpdb->prepare($query,$id),OBJECT);
+		$result->options = unserialize($result->options);
+		$result->options = implode('|',$result->options);
+		$response['type'] = 'ok';
+		$response['question'] = $result;
+		header('Content-Type: application/json');
+		echo json_encode( $response );
+		wp_die();	
+		 
 	}
 
 	public function ft_register_settings() {
@@ -835,6 +987,6 @@ class WP_Frelance_Test
 
 }
 
-new WP_Frelance_Test();
+new WP_Freelance_Test();
 }
 
