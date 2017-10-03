@@ -4,7 +4,7 @@
 		<div class="row" id="step1"> 
 			<form id="form_mail" name="form_mail" method="post" enctype="multipart/form-data">
 				<div class="row">
-					<div class="span"><span>* Please enter your email address below in order to gain access to the test instructions:</span></div>
+					<div class="span"><span>* Please enter your email below in order to get access to the test instructions:</span></div>
 					<input disabled defaultvalue="<?php echo esc_attr($current_user->user_email);?>" class="form_component" id="email" name="email" placeholder="E-Mail" type="email" value="<?php echo $current_user->user_email;?>">
 				</div>
 				<div class="row" style="padding-top:20px; text-align:center;"> 
@@ -17,7 +17,7 @@
 		</div>
 		<div class="row" id="step2">
 			<div class="row" style="text-align:justify;padding: 10px;">
-				<p >Please read the test instructions below. You have 2.5 hours to complete your test. Once you have finished, pack your test in a .zip file and upload it using the form at the bottom of the page.</p>
+				<p >Please read the test instructions below. You have 2.5 hours to complete your test. Once you had finish, pack your test in a .zip file and upload it using the form on the bottom of the page.</p>
 				<hr>
 				<h3 style="text-align:center;padding-top:0px;padding-bottom:0px;">Test instructions</h3> 
 				<p id="test_instructions_container"></p>
